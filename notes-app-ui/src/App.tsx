@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 
 type Note = {
@@ -9,96 +9,104 @@ type Note = {
 
 const App = () => {
   // Simulate API call and store returned data in state
-  const [notes, setNotes] = useState<Note[]>([
-    {
-      id: 1,
-      title: "test note 1",
-      content: "bla bla note1",
-    },
-    {
-      id: 2,
-      title: "test note 2 ",
-      content: "bla bla note2",
-    },
-    {
-      id: 3,
-      title: "test note 3",
-      content: "bla bla note3",
-    },
-    {
-      id: 4,
-      title: "test note 4 ",
-      content: "bla bla note4",
-    },
-    {
-      id: 5,
-      title: "test note 5",
-      content: "bla bla note5",
-    },
-    {
-      id: 6,
-      title: "test note 6",
-      content: "bla bla note6",
-    },
-  ]);
+  const [notes, setNotes] = useState<Note[]>([]);
 
   const [title, setTitle] = useState<String>("");
   const [content, setContent] = useState<String>("");
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
-  const deleteNote = (event: React.MouseEvent, noteId: number) => {
-    // Delete button is nested within a clickable note
-    // Prevents delete note event from iterfering with the note click event
-    event.stopPropagation();
-
-    // Filters through array and only return notes whose ID's do not match parameter
-    const updatedNotes = notes.filter((note) => note.id !== noteId);
-
-    setNotes(updatedNotes);
-  }
-
-  const handleAddNote = (event: React.FormEvent) => {
-    // Prevents the form from submitting and refreshing the page
-    event.preventDefault();
-
-    const newNote: Note = {
-      id: notes.length + 1,
-      title: title,
-      content: content,
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/notes");
+        const notes: Note[] = await response.json();
+        setNotes(notes);
+      } catch (e) {
+        console.log(e);
+      }
     };
 
-    setNotes([...notes, newNote]);
-    setTitle("");
-    setContent("");
+    fetchNotes();
+  }, []); //Empty dependency array so only runs once when the component is first mounted
+
+  const deleteNote = async (event: React.MouseEvent, noteId: number) => {
+    event.stopPropagation();
+
+    try {
+      await fetch(`http://localhost:5000/api/notes/${noteId}`, {
+        method: "DELETE",
+      });
+      const updatedNotes = notes.filter((note) => note.id !== noteId);
+
+      setNotes(updatedNotes);
+    } catch (e) {
+      console.log(e);
+    }
   };
 
-  const handleUpdateNote = (event: React.FormEvent) => {
-    // Prevents the form from submitting and refreshing the page
-    event.preventDefault();
+  const handleAddNote = async (event: React.formEvent) => {
+    try {
+      const response = await fetch("http://localhost:5000/api/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          content,
+        }),
+      });
 
+      const newNote = await response.json();
+
+      setNotes([...notes, newNote]);
+      setTitle("");
+      setContent("");
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  const handleUpdateNote = async (event: React.formEvent) => {
     if (!selectedNote) {
       return;
     }
 
-    const updatedNote: Note = {
-      id: selectedNote.id,
-      title: title,
-      content: content,
-    };
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/notes/${selectedNote.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title,
+            content,
+          }),
+        }
+      );
 
-    const updatedNotesList = notes.map((note) => (note.id===selectedNote.id ? updatedNote : note));
+      const updatedNote = await response.json();
 
-    setNotes(updatedNotesList);
-    setTitle("");
-    setContent("");
-    setSelectedNote(null);
+      const updatedNotesList = notes.map((note) =>
+        note.id === selectedNote.id ? updatedNote : note
+      );
+
+      setNotes(updatedNotesList);
+      setTitle("");
+      setContent("");
+      setSelectedNote(null);
+    } catch (e) {
+      console.log(e);
+    }
   };
 
   const handleCancel = () => {
     setTitle("");
     setContent("");
     setSelectedNote(null);
-  }
+  };
 
   const handleNoteClick = (note: Note) => {
     setSelectedNote(note);
@@ -108,7 +116,12 @@ const App = () => {
 
   return (
     <div className="app-container">
-      <form className="note-form" onSubmit={(event) => (selectedNote ? handleUpdateNote(event) : handleAddNote(event))}>
+      <form
+        className="note-form"
+        onSubmit={(event) =>
+          selectedNote ? handleUpdateNote(event) : handleAddNote(event)
+        }
+      >
         <input
           id="title-input"
           value={title}
@@ -129,10 +142,14 @@ const App = () => {
             <button type="submit">Save</button>
             <button onClick={handleCancel}>Cancel</button>
           </div>
-        ) : (<button type="submit">Add Note</button>)}
+        ) : (
+          <button type="submit">Add Note</button>
+        )}
       </form>
       <h1 className="notes-grid-header">Notes</h1>
-      {notes.length===0 && <p className="no-notes-body">No notes to display</p>}
+      {notes.length === 0 && (
+        <p className="no-notes-body">No notes to display</p>
+      )}
       <div className="notes-grid">
         {notes.map((note) => (
           <div
